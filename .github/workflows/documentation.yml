@@ -14,11 +14,11 @@ jobs:
       uses: actions/checkout@v2
   
     - name: Build Slate documentation
+      env:
+        MONGO_CONNECTION_STRING: ${{ secrets.MONGO_CONNECTION_STRING_READ }}
       run: |
         (pip install -r ../query_api/requirements.txt && python generate.py)
         docker run --rm --name slate -v $(pwd)/build:/srv/slate/build -v $(pwd)/source:/srv/slate/source slatedocs/slate build
-      with:
-        MONGO_CONNECTION_STRING: ${{ secrets.MONGO_CONNECTION_STRING_READ }}
 
     - name: Deploy documentation to Github Pages
       uses: JamesIves/github-pages-deploy-action@v4
