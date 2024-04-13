@@ -51,6 +51,15 @@ def _hash_dict(dct: Dict) -> str:
     return hashlib.sha256(dct_str.encode()).hexdigest()
 
 
+async def _update(collection: AsyncIOMotorCollection, docs: List[Dict]):
+    """Updates documents in a MongoDB collection"""
+    try:
+        await collection.update_many({'_key': {'$in': [doc['_key'] for doc in docs]}}, {'$set': docs})
+    except pymongo.errors.BulkWriteError as e:
+        for error in e.details.get('writeErrors'):
+            logger.error(error)
+
+
 async def _insert(collection: AsyncIOMotorCollection, docs: List[Dict]):
     """Inserts documents to a MongoDB collection and skips duplicates"""
     # Create an ID to check for duplicates
@@ -74,6 +83,17 @@ def _get_batches(docs: List[Dict]) -> Iterator[List[Dict]]:
     """Yields batches of maximum size `BATCH_SIZE`"""
     for i in range(0, len(docs), BATCH_SIZE):
         yield docs[i:i+BATCH_SIZE]
+
+
+async def update_data_async(collection_name: str, docs: List[Dict],
+                            mongo_db: Optional[AsyncIOMotorClient] = None):
+    """Updates documents in a MongoDB collection."""
+    if mongo_db is None:
+        mongo_db = get_mongo_db()
+
+    collection = mongo_db[collection_name]
+    tasks = [_update(collection=collection, docs=batch) for batch in _get_batches(docs)]
+    await asyncio.gather(*tasks)
 
 
 async def insert_data_async(collection_name: str, docs: List[Dict],

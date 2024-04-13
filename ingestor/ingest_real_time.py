@@ -8,7 +8,7 @@ import pytz
 from tqdm import tqdm
 from parsing import parse_line
 from motor.motor_asyncio import AsyncIOMotorClient
-from db import get_mongo_db, insert_data_async
+from db import get_mongo_db, insert_data_async, update_data_async
 from util import to_datetime
 
 _start_time = None  # Date at which data starts being ingested
@@ -100,13 +100,17 @@ async def _ingest(mongo_db: AsyncIOMotorClient, force: bool = False) -> List:
         # Group data by collection for faster addition to the database
         for collection, vals in _parsed.items():
             parsed[collection] += vals
+            # TODO: change this too
 
     # Save to database
     tasks = []
     for collection_name, docs in parsed.items():
+        docs_to_update = [d for d in docs if "_key" in d]
+        docs_to_insert = [d for d in docs if "_key" not in d]
+        tasks.append(asyncio.create_task(update_data_async(collection_name=collection_name, docs=docs_to_update, mongo_db=mongo_db)))
         tasks.append(
             asyncio.create_task(insert_data_async(collection_name=collection_name,
-                                                  docs=docs, mongo_db=mongo_db))
+                                                  docs=docs_to_insert, mongo_db=mongo_db))
         )
     return tasks
 
